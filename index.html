@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Petualangan Piyo Menangkap Makanan</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #a0e7e5;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            overflow: hidden;
+            color: #4b4b4b;
+            transition: background-color 0.5s ease;
+        }
+        #game-container {
+            width: 800px;
+            height: 500px;
+            background-color: #f7f3e9;
+            border: 10px solid #ffffff;
+            border-radius: 25px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+        #background {
+            position: absolute;
+            top: 0; left: 0;
+            width: 200%; height: 100%;
+            background-image: url('https://www.transparenttextures.com/patterns/az-subtle.png'), 
+                              linear-gradient(to bottom, #b3e5fc 0%, #e1f5fe 70%, #f7f3e9 100%);
+            animation: slideBackground 40s linear infinite;
+            transition: background-image 0.5s ease;
+        }
+        @keyframes slideBackground {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+        #pet {
+            width: 70px; height: 70px;
+            background-color: #ffd1dc;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 10px;
+            left: calc(50% - 35px);
+            transition: left 0.1s linear, background-color 0.5s ease, border-color 0.5s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 5px solid #ffb3c6;
+        }
+        #pet-face { text-align: center; font-weight: bold; font-size: 18px; color: #333; position: relative; }
+        .eye { width: 8px; height: 12px; background-color: #333; border-radius: 50%; display: inline-block; margin: 0 4px; }
+        #mouth { margin-top: 3px; }
+        .blush { width: 12px; height: 6px; background-color: rgba(255, 105, 180, 0.5); border-radius: 50%; position: absolute; top: 8px; }
+        .blush.left { left: -15px; }
+        .blush.right { right: -15px; }
+        .item { width: 45px; height: 45px; font-size: 40px; position: absolute; top: -50px; text-align: center; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .ui-screen { position: absolute; z-index: 10; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(8px); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .ui-screen h2 { font-size: 52px; margin-bottom: 10px; color: #ff69b4; }
+        .ui-screen p { font-size: 20px; max-width: 80%; }
+        #theme-selection { display: flex; gap: 20px; margin-top: 20px; }
+        .button { padding: 15px 40px; font-size: 24px; font-family: inherit; border: none; border-radius: 50px; background-color: #ffafcc; color: white; cursor: pointer; text-shadow: 1px 1px 3px rgba(0,0,0,0.2); transition: all 0.2s ease; border-bottom: 5px solid #ff8fab; }
+        .button:hover { transform: scale(1.1); box-shadow: 0 8px 15px rgba(255, 175, 204, 0.5); }
+        .button:active { transform: scale(1.05); }
+        #score-board { position: absolute; top: 15px; right: 25px; font-size: 28px; font-weight: bold; background-color: rgba(255, 255, 255, 0.5); padding: 5px 15px; border-radius: 20px; }
+        #mute-button { position: absolute; top: 15px; left: 20px; font-size: 28px; background: none; border: none; cursor: pointer; opacity: 0.7; transition: opacity 0.2s, transform 0.2s; z-index: 20; }
+        #mute-button:hover { opacity: 1; transform: scale(1.2); }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="background"></div>
+        <div id="score-board">Skor: 0</div>
+        <button id="mute-button">🔊</button>
+        <div id="pet">
+            <div id="pet-face">
+                <div class="blush left"></div>
+                <div><span class="eye"></span><span class="eye"></span></div>
+                <div id="mouth">o</div>
+                <div class="blush right"></div>
+            </div>
+        </div>
+        <div class="ui-screen" id="start-screen">
+            <h2>Petualangan Piyo</h2>
+            <p>Pilih suasana petualanganmu!</p>
+            <div id="theme-selection">
+                <button class="button" data-theme="classic">Manis 🍭</button>
+                <button class="button" data-theme="beach">Pantai 🏖️</button>
+                <button class="button" data-theme="space">Luar Angkasa 🚀</button>
+            </div>
+        </div>
+        <div class="ui-screen" id="game-over-screen" style="display: none;">
+            <h2>Game Over!</h2>
+            <p id="final-score"></p>
+            <button class="button" id="restart-button">Pilih Suasana Lain</button>
+        </div>
+    </div>
+    
+    <audio id="background-music" loop>
+        <source src="https://cdn.pixabay.com/download/audio/2022/12/22/audio_fb33b00673.mp3" type="audio/mpeg">
+        
+    </audio>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const pet = document.getElementById('pet');
+        const petMouth = document.getElementById('mouth');
+        const scoreBoard = document.getElementById('score-board');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const restartButton = document.getElementById('restart-button');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const backgroundMusic = document.getElementById('background-music');
+        const muteButton = document.getElementById('mute-button');
+        const themeButtons = document.querySelectorAll('#theme-selection .button');
+        const gameBackground = document.getElementById('background');
+
+        let score, gameIsActive, petPosition, gameLoop, itemSpawner;
+        let audioContext;
+        let isAudioInitialized = false;
+        
+        const petSpeed = 20;
+        let itemFallSpeed = 2;
+        let itemSpawnInterval = 1500;
+        
+        let currentGoodItems, currentBadItems;
+        const themes = {
+            classic: {
+                name: 'classic',
+                goodItems: ['🍩', '🍓', '🍰', '🍪', '🍭', '🍉', '💖'],
+                badItems: ['🍄', '💣', '☠️'],
+                bodyBg: '#a0e7e5',
+                gameGradient: 'linear-gradient(to bottom, #b3e5fc 0%, #e1f5fe 70%, #f7f3e9 100%)',
+                petColor: '#ffd1dc', petBorder: '#ffb3c6',
+                buttonBg: '#ffafcc', buttonBorder: '#ff8fab'
+            },
+            beach: {
+                name: 'beach',
+                goodItems: ['🥥', '🍍', '🍦', '🍉', '⭐', '🍹'],
+                badItems: ['🦀', '🐙', '💣'],
+                bodyBg: '#4FC3F7',
+                gameGradient: 'linear-gradient(to bottom, #00c6ff 0%, #0072ff 100%)',
+                petColor: '#FFD180', petBorder: '#FFAB40',
+                buttonBg: '#FFC107', buttonBorder: '#FFA000'
+            },
+            space: {
+                name: 'space',
+                goodItems: ['⭐', '🪐', '💎', '🚀', '✨'],
+                badItems: ['👽', '👾', '☄️', '💣'],
+                bodyBg: '#2c3e50',
+                gameGradient: 'linear-gradient(to bottom, #0f2027 0%, #203a43 50%, #2c5364 100%)',
+                petColor: '#BDBDBD', petBorder: '#757575',
+                buttonBg: '#90A4AE', buttonBorder: '#607D8B'
+            }
+        };
+
+        function applyTheme(themeName) {
+            const theme = themes[themeName];
+            currentGoodItems = theme.goodItems;
+            currentBadItems = theme.badItems;
+
+            document.body.style.backgroundColor = theme.bodyBg;
+            gameBackground.style.backgroundImage = `url('https://www.transparenttextures.com/patterns/az-subtle.png'), ${theme.gameGradient}`;
+            pet.style.backgroundColor = theme.petColor;
+            pet.style.borderBottomColor = theme.petBorder; // Perbaikan: gunakan borderBottomColor
+            
+            // Terapkan warna tombol ke semua tombol yang relevan
+            document.querySelectorAll('.button').forEach(btn => {
+                btn.style.backgroundColor = theme.buttonBg;
+                btn.style.borderBottomColor = theme.buttonBorder;
+            });
+            // Pastikan warna text H2 di start-screen juga berubah jika diinginkan
+            startScreen.querySelector('h2').style.color = theme.buttonBg; 
+        }
+        
+        function initializeAudio() {
+            if (!isAudioInitialized) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaElementSource(backgroundMusic);
+                source.connect(audioContext.destination);
+                isAudioInitialized = true;
+            }
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().then(() => {
+                    console.log("AudioContext resumed successfully.");
+                    backgroundMusic.play().catch(e => console.error("Error playing background music after resume:", e));
+                }).catch(e => console.error("Error resuming AudioContext:", e));
+            } else {
+                backgroundMusic.play().catch(e => console.error("Error playing background music:", e));
+            }
+        }
+
+        function playSound(type) {
+            if (!isAudioInitialized || backgroundMusic.muted || audioContext.state === 'suspended') return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+
+            if (type === 'catch') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.2);
+            } else if (type === 'gameOver') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.5);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.5);
+            }
+        }
+
+        function startGame(themeName) {
+            applyTheme(themeName);
+            initializeAudio(); // Pastikan audio diinisialisasi/dilanjutkan
+
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            score = 0;
+            updateScore(0);
+            gameIsActive = true;
+            itemFallSpeed = 2;
+            itemSpawnInterval = 1500;
+            petPosition = pet.offsetLeft;
+            
+            document.querySelectorAll('.item').forEach(item => item.remove());
+            gameLoop = setInterval(updateGame, 16);
+            itemSpawner = setInterval(createItem, itemSpawnInterval);
+        }
+        
+        function createItem() {
+            if (!gameIsActive) return;
+
+            const item = document.createElement('div');
+            item.classList.add('item');
+
+            if (Math.random() < 0.8) {
+                item.textContent = currentGoodItems[Math.floor(Math.random() * currentGoodItems.length)];
+                item.dataset.type = 'good';
+            } else {
+                item.textContent = currentBadItems[Math.floor(Math.random() * currentBadItems.length)];
+                item.dataset.type = 'bad';
+            }
+
+            const randomX = Math.random() * (gameContainer.offsetWidth - 45);
+            item.style.left = `${randomX}px`;
+            gameContainer.appendChild(item);
+        }
+
+        function updateGame() {
+            if (!gameIsActive) return;
+            
+            const petRect = pet.getBoundingClientRect();
+            document.querySelectorAll('.item').forEach(item => {
+                let itemTop = item.offsetTop;
+                item.style.top = `${itemTop + itemFallSpeed}px`;
+                const itemRect = item.getBoundingClientRect();
+
+                if (petRect.left < itemRect.right && petRect.right > itemRect.left && petRect.top < itemRect.bottom && petRect.bottom > itemRect.top) {
+                    if (item.dataset.type === 'good') {
+                        item.remove();
+                        updateScore(1);
+                        petHappyAnimation();
+                        playSound('catch');
+                    } else {
+                        endGame();
+                    }
+                }
+
+                if (itemTop > gameContainer.offsetHeight) {
+                    if (item.dataset.type === 'good') {
+                        endGame();
+                    } else {
+                        item.remove();
+                    }
+                }
+            });
+        }
+
+        function updateScore(points) {
+            score += points;
+            scoreBoard.textContent = `Skor: ${score}`;
+
+            if (score > 0 && score % 5 === 0 && points > 0) {
+                itemFallSpeed += 0.2;
+                if (itemSpawnInterval > 500) {
+                    itemSpawnInterval -= 100;
+                    clearInterval(itemSpawner);
+                    itemSpawner = setInterval(createItem, itemSpawnInterval);
+                }
+            }
+        }
+
+        function petHappyAnimation() {
+            petMouth.textContent = 'v';
+            pet.style.transform = 'scale(1.15) rotate(5deg)';
+            setTimeout(() => {
+                pet.style.transform = 'scale(1.15) rotate(-5deg)';
+            }, 150);
+            setTimeout(() => {
+                petMouth.textContent = 'o';
+                pet.style.transform = 'scale(1)';
+            }, 300);
+        }
+
+        function endGame() {
+            if (!gameIsActive) return;
+            gameIsActive = false;
+            clearInterval(gameLoop);
+            clearInterval(itemSpawner);
+            playSound('gameOver');
+            
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0; // Reset musik
+
+            finalScoreDisplay.textContent = `Skor akhirmu: ${score}`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        function returnToMenu() {
+             gameOverScreen.style.display = 'none';
+             startScreen.style.display = 'flex';
+             document.querySelectorAll('.item').forEach(item => item.remove());
+             scoreBoard.textContent = `Skor: 0`;
+             // Tidak perlu menghentikan musik di sini, biarkan AudioContext tetap aktif
+             if(isAudioInitialized && !backgroundMusic.muted) {
+                backgroundMusic.pause(); // Pause saja, jangan reset currentTime agar saat start lagi bisa lanjut
+             }
+        }
+
+        function toggleMute() {
+            if (!isAudioInitialized) return;
+            backgroundMusic.muted = !backgroundMusic.muted;
+            muteButton.textContent = backgroundMusic.muted ? '🔇' : '🔊';
+            if (backgroundMusic.muted && audioContext.state === 'running') {
+                audioContext.suspend();
+            } else if (!backgroundMusic.muted && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+        
+        function movePet(direction) {
+            if (!gameIsActive) return;
+            petPosition += (direction === 'left' ? -petSpeed : petSpeed);
+            const maxPos = gameContainer.offsetWidth - pet.offsetWidth;
+            petPosition = Math.max(0, Math.min(petPosition, maxPos));
+            pet.style.left = `${petPosition}px`;
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') movePet('left');
+            else if (e.key === 'ArrowRight') movePet('right');
+        });
+
+        function handlePointerMove(clientX) {
+             if (!gameIsActive) return;
+             const rect = gameContainer.getBoundingClientRect();
+             petPosition = clientX - rect.left - (pet.offsetWidth / 2);
+             const maxPos = gameContainer.offsetWidth - pet.offsetWidth;
+             petPosition = Math.max(0, Math.min(petPosition, maxPos));
+             pet.style.left = `${petPosition}px`;
+        }
+
+        gameContainer.addEventListener('mousemove', (e) => handlePointerMove(e.clientX));
+        gameContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            handlePointerMove(e.touches[0].clientX);
+        }, { passive: false });
+        
+        themeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const theme = button.dataset.theme;
+                startGame(theme);
+            });
+        });
+
+        restartButton.addEventListener('click', returnToMenu);
+        muteButton.addEventListener('click', toggleMute);
+
+        // Inisialisasi tema default saat pertama kali memuat halaman
+        applyTheme('classic'); 
+    </script>
+</body>
+</html>
